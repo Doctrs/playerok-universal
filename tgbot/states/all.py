@@ -73,6 +73,7 @@ class CompleteDealsStates(StatesGroup):
 
 class BumpItemsStates(StatesGroup):
     waiting_for_bump_items_interval = State()
+    waiting_for_bump_items_below_position = State()
     
     waiting_for_new_included_bump_item_keyphrases = State()
     waiting_for_new_included_bump_items_keyphrases_file = State()

@@ -43,6 +43,43 @@ async def handler_waiting_for_bump_items_interval(message: types.Message, state:
         )
 
 
+@router.message(states.BumpItemsStates.waiting_for_bump_items_below_position, F.text)
+async def handler_waiting_for_bump_items_below_position(message: types.Message, state: FSMContext):
+    try: 
+        await state.set_state(None)
+        
+        if not message.text.isdigit():
+            raise Exception("❌ Вы должны ввести числовое значение")
+
+        below_position = int(message.text)
+        
+        config = sett.get("config")
+        config["playerok"]["auto_bump_items"]["below_position"] = below_position
+        sett.set("config", config)
+
+        if below_position:
+            result_text = (
+                f"✅ Товары будут подниматься только если позиция <b>ниже {below_position}</b> "
+                f"(с {below_position + 1}-й и дальше)"
+            )
+        else:
+            result_text = "✅ Ограничение по позиции <b>отключено</b> — товары будут подниматься всегда"
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_float_text(result_text),
+            reply_markup=templ.back_kb(calls.MenuNavigation(to="bump").pack())
+        )
+    except Exception as e:
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_float_text(e), 
+            reply_markup=templ.back_kb(calls.MenuNavigation(to="bump").pack())
+        )
+
+
 @router.message(states.BumpItemsStates.waiting_for_new_included_bump_item_keyphrases, F.text)
 async def handler_waiting_for_new_included_bump_item_keyphrases(message: types.Message, state: FSMContext):
     try: 

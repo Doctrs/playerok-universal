@@ -22,7 +22,7 @@ from __init__ import VERSION
 from core.utils import restart
 
 
-REPO = "alleexxeeyy/playerok-universal"
+REPO = "Doctrs/playerok-universal"
 logger = getLogger("universal.updater")
 
 latest_release = None

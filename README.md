@@ -52,7 +52,7 @@
 
 ### 🔷 Windows
 1. Установите **Python версии 3.12.x** (на других версиях работа бота не гарантируется), перейдя по ссылке https://www.python.org/downloads/release/python-31210/ (при установке нажмите на пункт `Add to PATH`).
-2. Скачайте [последнюю Release версию](https://github.com/alleexxeeyy/playerok-universal/releases/latest) и распакуйте в любое удобное для вас место.
+2. Скачайте [последнюю Release версию](https://github.com/Doctrs/playerok-universal/releases/latest) и распакуйте в любое удобное для вас место.
 3. Откройте `install.bat` и дождитесь установки всех необходимых зависимостей, а после закройте окно.
 4. Чтобы запустить бота, откройте запускатор `start.bat`.
 5. После первого запуска следуйте действиям в консоли.
@@ -64,7 +64,7 @@
    ```bash
    brew install python@3.12
    ```
-2. Скачайте [последнюю Release версию](https://github.com/alleexxeeyy/funpay-universal/releases/latest) и распакуйте в любое удобное место.
+2. Скачайте [последнюю Release версию](https://github.com/Doctrs/playerok-universal/releases/latest) и распакуйте в любое удобное место.
 3. Дважды кликните `install_mac.command` — откроется Terminal, дождитесь установки зависимостей.
 4. Запустите бота двойным кликом по `start_mac.command`.
 5. Следуйте инструкциям в консоли.
@@ -73,7 +73,7 @@
 1. Выполните команду
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/alleexxeeyy/playerok-universal/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/Doctrs/playerok-universal/main/install.sh)
 ```
 2. Следуйте инструкциям установщика. Он автоматически установит все необходимые для работы компоненты.
 

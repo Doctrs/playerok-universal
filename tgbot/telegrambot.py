@@ -101,7 +101,7 @@ class TelegramBot:
                 🖌️ Кастомизация
                 🔌 Плагины
                                         
-                ⬇️ Скачать бота: https://github.com/alleexxeeyy/playerok-universal
+                ⬇️ Скачать бота: https://github.com/Doctrs/playerok-universal
                 
                 📢 Новости: @alexeyproduction
                 🤖 Плагины: @alexey_production_bot

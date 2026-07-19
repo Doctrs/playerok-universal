@@ -273,6 +273,26 @@ async def callback_enter_auto_bump_items_interval(callback: CallbackQuery, state
     )
 
 
+@router.callback_query(F.data == "enter_auto_bump_items_below_position")
+async def callback_enter_auto_bump_items_below_position(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(states.BumpItemsStates.waiting_for_bump_items_below_position)
+    
+    config = sett.get("config")
+    below_position = config["playerok"]["auto_bump_items"].get("below_position", 0)
+    
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_float_text(
+            f"📍 Введите позицию: товар будет подниматься <b>только если его позиция ниже</b> этого числа."
+            f"\n\n・ <b>0</b> — без ограничения (поднимать всегда)"
+            f"\n・ Например, <b>5</b> — поднимать с 6-й позиции и ниже"
+            f"\n\n・ <b>Текущее:</b> <code>{below_position}</code>"
+        ),
+        reply_markup=templ.back_kb(calls.MenuNavigation(to="bump").pack())
+    )
+
+
 @router.callback_query(F.data == "enter_new_included_bump_item_keyphrases")
 async def callback_enter_new_included_bump_item_keyphrases(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()

@@ -14,6 +14,8 @@ def bump_text():
     enabled = "✅" if config["playerok"]["auto_bump_items"]["enabled"] else "❌"
     all = "Все товары" if config["playerok"]["auto_bump_items"]["all"] else "Указанные товары"
     interval = config["playerok"]["auto_bump_items"]["interval"] or "❌ Не указано"
+    below_position = config["playerok"]["auto_bump_items"].get("below_position", 0)
+    below_position_str = f"ниже {below_position}" if below_position else "❌ Выкл"
     
     auto_bump_items = sett.get("auto_bump_items")
     included = len(auto_bump_items["included"])
@@ -36,6 +38,8 @@ def bump_text():
 
         <b>💡 Включено:</b> {enabled}
         <b>⏰ Интервал:</b> {interval} сек.
+        <b>📍 Позиция:</b> {below_position_str}
+        <blockquote><b>(?)</b> Если задано число N, товар поднимается только когда его позиция строго ниже N (например, при N=5 — с 6-й позиции и дальше). 0 — без ограничения.</blockquote>
 
         <b>📦 Поднимать:</b> {all}
         <blockquote><b>(?)</b> Если вы выберете "Все товары", то будут подниматься все товары, кроме тех, что указаны в исключениях. Если вы выберете "Указанные товары", то будут подниматься только те товары, которые вы добавите во включенные.</blockquote>
@@ -55,6 +59,8 @@ def bump_kb():
     enabled = "✅" if config["playerok"]["auto_bump_items"]["enabled"] else "❌"
     all = "Все товары" if config["playerok"]["auto_bump_items"]["all"] else "Указанные товары"
     interval = config["playerok"]["auto_bump_items"]["interval"] or "❌ Не указано"
+    below_position = config["playerok"]["auto_bump_items"].get("below_position", 0)
+    below_position_str = f"ниже {below_position}" if below_position else "❌ Выкл"
     
     auto_bump_items = sett.get("auto_bump_items")
     included = len(auto_bump_items["included"])
@@ -65,6 +71,7 @@ def bump_kb():
         [InlineKeyboardButton(text=f"💡 Включено: {enabled}", callback_data="switch_auto_bump_items_enabled")],
         [InlineKeyboardButton(text=f"📦 Поднимать: {all}", callback_data="switch_auto_bump_items_all")],
         [InlineKeyboardButton(text=f"⏰ Интервал: {interval} сек.", callback_data="enter_auto_bump_items_interval")],
+        [InlineKeyboardButton(text=f"📍 Позиция: {below_position_str}", callback_data="enter_auto_bump_items_below_position")],
         [
         InlineKeyboardButton(text=f"➕ Включенные: {included}", callback_data=calls.IncludedBumpItemsPagination(page=0).pack()),
         InlineKeyboardButton(text=f"➖ Исключенные: {excluded}", callback_data=calls.ExcludedBumpItemsPagination(page=0).pack())

@@ -42,6 +42,7 @@ CONFIG = SettingsFile(
             "auto_bump_items": {
                 "enabled": False,
                 "interval": 3600,
+                "below_position": 0,
                 "all": False,
                 "last_time": ""
             },

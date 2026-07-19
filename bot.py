@@ -98,7 +98,7 @@ if __name__ == "__main__":
             f"\n     {ACCENT_COLOR}Playerok Universal {Fore.WHITE}v{Fore.LIGHTWHITE_EX}{VERSION}"
             f"\n       {Fore.WHITE}by {Fore.LIGHTYELLOW_EX}@friedfluoride (3xtra)"
             f"\n"
-            f"\n     {Fore.WHITE}· GitHub: {Fore.LIGHTWHITE_EX}github.com/alleexxeeyy/playerok-universal"
+            f"\n     {Fore.WHITE}· GitHub: {Fore.LIGHTWHITE_EX}github.com/Doctrs/playerok-universal"
             f"\n     {Fore.WHITE}· Новости: {Fore.LIGHTWHITE_EX}t.me/alexeyproduction"
             f"\n     {Fore.WHITE}· Плагины: {Fore.LIGHTWHITE_EX}t.me/alexey_production_bot"
             f"\n\n   {Fore.LIGHTYELLOW_EX}└───────────────────────────────────────┘\n\n"

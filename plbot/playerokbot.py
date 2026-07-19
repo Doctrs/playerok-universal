@@ -375,6 +375,15 @@ class PlayerokBot:
                 if not isinstance(item, MyItem):
                     try: item = self.account.get_item(item.id)
                     except: return
+
+                below_position = self.config["playerok"]["auto_bump_items"].get("below_position", 0)
+                if below_position and item.sequence is not None and item.sequence <= below_position:
+                    logger.info(
+                        f"{Fore.LIGHTWHITE_EX}«{name_frmtd}» {Fore.WHITE}— {Fore.CYAN}пропущен. "
+                        f"{Fore.WHITE}Позиция {Fore.LIGHTWHITE_EX}{item.sequence} "
+                        f"{Fore.WHITE}≤ {Fore.LIGHTWHITE_EX}{below_position}"
+                    )
+                    return False
                     
                 time.sleep(1)
                 statuses = self.account.get_item_priority_statuses(item.id, item.raw_price)

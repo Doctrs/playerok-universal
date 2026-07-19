@@ -72,7 +72,7 @@ def menu_kb():
         ],
         [
         InlineKeyboardButton(text="👨‍💻 Разработчик", url="https://t.me/alleexxeeyy"), 
-        InlineKeyboardButton(text="🐈‍⬛ GitHub", url="https://github.com/alleexxeeyy/playerok-universal"),
+        InlineKeyboardButton(text="🐈‍⬛ GitHub", url="https://github.com/Doctrs/playerok-universal"),
         ]
     ]
     

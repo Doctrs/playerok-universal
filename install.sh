@@ -2,6 +2,7 @@
 
 # ============================================================
 #  Установщик бота Playerok Universal
+#  Форк: https://github.com/Doctrs/playerok-universal
 # ============================================================
 
 set -e
@@ -9,7 +10,7 @@ set -e
 BOT_NAME="playerokuniversal"
 BOT_DIR="/root/playerokuniversal"
 BOT_FILE="bot.py"
-REPO="alleexxeeyy/playerok-universal"
+REPO="Doctrs/playerok-universal"
 SERVICE_FILE="/etc/systemd/system/${BOT_NAME}.service"
 PYTHON="python3.12"
 CMD="pluniversal"
@@ -38,14 +39,57 @@ warn()    { echo -e "  ${YELLOW}⚠${NC}  $1"; }
 error()   { echo -e "\n  ${CROSS}  ${RED}${BOLD}$1${NC}\n"; exit 1; }
 step()    { echo -e "\n  ${BOLD}${WHITE}$1${NC}"; echo -e "  ${GRAY}$(printf '─%.0s' {1..44})${NC}"; }
 
+download_bot() {
+  local dest="$1"
+  info "Скачиваю последний релиз с GitHub (${REPO})..."
+  LATEST_URL=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"zipball_url"' | cut -d'"' -f4 || true)
+  if [[ -z "$LATEST_URL" ]]; then
+    LATEST_URL="https://github.com/${REPO}/archive/refs/heads/main.zip"
+    info "Релизов нет — скачиваю main ветку..."
+  fi
+  curl -sL "$LATEST_URL" -o /tmp/bot_update.zip
+
+  # Сохраняем конфиг, venv и run.sh если уже есть
+  if [[ -d "${dest}/bot_settings" ]]; then
+    cp -r "${dest}/bot_settings" /tmp/bot_settings_backup
+  fi
+  if [[ -d "${dest}/venv" ]]; then
+    mv "${dest}/venv" /tmp/bot_venv_backup
+  fi
+  if [[ -f "${dest}/run.sh" ]]; then
+    cp "${dest}/run.sh" /tmp/bot_run_backup
+  fi
+
+  rm -rf /tmp/bot_extract
+  unzip -q /tmp/bot_update.zip -d /tmp/bot_extract
+  EXTRACTED=$(ls /tmp/bot_extract | head -1)
+  rm -rf "${dest}"
+  mv "/tmp/bot_extract/$EXTRACTED" "${dest}"
+
+  if [[ -d "/tmp/bot_settings_backup" ]]; then
+    cp -r /tmp/bot_settings_backup "${dest}/bot_settings"
+    rm -rf /tmp/bot_settings_backup
+  fi
+  if [[ -d "/tmp/bot_venv_backup" ]]; then
+    mv /tmp/bot_venv_backup "${dest}/venv"
+  fi
+  if [[ -f "/tmp/bot_run_backup" ]]; then
+    mv /tmp/bot_run_backup "${dest}/run.sh"
+    chmod +x "${dest}/run.sh"
+  fi
+
+  rm -f /tmp/bot_update.zip
+  rm -rf /tmp/bot_extract
+}
+
 clear
 
 echo ""
 echo -e "  ${CYAN}${BOLD}██████╗ ██╗      ${NC}"
 echo -e "  ${CYAN}${BOLD}██╔══██╗██║      ${NC}  ${WHITE}${BOLD}Playerok Universal${NC}"
-echo -e "  ${CYAN}${BOLD}██████╔╝██║      ${NC}  ${GRAY}Установщик${NC}"
+echo -e "  ${CYAN}${BOLD}██████╔╝██║      ${NC}  ${GRAY}Установщик (форк)${NC}"
 echo -e "  ${CYAN}${BOLD}██╔═══╝ ██║      ${NC}"
-echo -e "  ${CYAN}${BOLD}██║     ███████╗ ${NC}  ${GRAY}github.com/alleexxeeyy/playerok-universal${NC}"
+echo -e "  ${CYAN}${BOLD}██║     ███████╗ ${NC}  ${GRAY}github.com/${REPO}${NC}"
 echo -e "  ${CYAN}${BOLD}╚═╝     ╚══════╝ ${NC}"
 echo ""
 echo -e "  ${GRAY}$(printf '═%.0s' {1..48})${NC}"
@@ -71,7 +115,7 @@ step "Источник установки"
 echo ""
 echo -e "  ${WHITE}Откуда установить бота?${NC}"
 echo ""
-echo -e "  ${CYAN}${BOLD}1${NC}  ${WHITE}Скачать с GitHub${NC}  ${GRAY}(рекомендуется)${NC}"
+echo -e "  ${CYAN}${BOLD}1${NC}  ${WHITE}Скачать с GitHub${NC}  ${GRAY}(${REPO})${NC}"
 echo -e "  ${CYAN}${BOLD}2${NC}  ${WHITE}Использовать файлы с сервера${NC}  ${GRAY}(уже загружены вручную)${NC}"
 echo ""
 read -rp "$(echo -e "  ${CYAN}›${NC} Ваш выбор [1/2]: ")" SOURCE_CHOICE
@@ -79,32 +123,8 @@ read -rp "$(echo -e "  ${CYAN}›${NC} Ваш выбор [1/2]: ")" SOURCE_CHOIC
 case "$SOURCE_CHOICE" in
   1)
     echo ""
-    info "Скачиваю последний релиз с GitHub..."
-    LATEST_URL=$(curl -s "https://api.github.com/repos/alleexxeeyy/playerok-universal/releases/latest" | grep '"zipball_url"' | cut -d'"' -f4)
-    if [[ -z "$LATEST_URL" ]]; then
-      # Нет релизов — берём архив main ветки
-      LATEST_URL="https://github.com/alleexxeeyy/playerok-universal/archive/refs/heads/main.zip"
-      info "Релизов нет — скачиваю main ветку..."
-    fi
-    curl -sL "$LATEST_URL" -o /tmp/bot_update.zip
-    # Сохраняем конфиг если он есть
-    if [[ -d "/root/playerokuniversal/bot_settings" ]]; then
-      cp -r "/root/playerokuniversal/bot_settings" /tmp/bot_settings_backup
-    fi
-    # Распаковываем во временную папку
-    rm -rf /tmp/bot_extract
-    unzip -q /tmp/bot_update.zip -d /tmp/bot_extract
-    EXTRACTED=$(ls /tmp/bot_extract | head -1)
-    # Переносим файлы, сохраняя bot_settings
-    rm -rf "/root/playerokuniversal"
-    mv "/tmp/bot_extract/$EXTRACTED" "/root/playerokuniversal"
-    # Восстанавливаем конфиг
-    if [[ -d "/tmp/bot_settings_backup" ]]; then
-      cp -r /tmp/bot_settings_backup "/root/playerokuniversal/bot_settings"
-      rm -rf /tmp/bot_settings_backup
-    fi
-    rm -f /tmp/bot_update.zip
-    success "Бот скачан и установлен в /root/playerokuniversal"
+    download_bot "$BOT_DIR"
+    success "Бот скачан и установлен в ${BOT_DIR}"
     ;;
   2)
     echo ""
@@ -116,6 +136,7 @@ case "$SOURCE_CHOICE" in
     fi
     if [[ "$CUSTOM_DIR" != "$BOT_DIR" ]]; then
       info "Копирую файлы из $CUSTOM_DIR..."
+      mkdir -p "$BOT_DIR"
       cp -r "$CUSTOM_DIR/." "$BOT_DIR"
       success "Файлы скопированы в $BOT_DIR"
     else
@@ -136,13 +157,10 @@ step "Python 3.12"
 info "Проверка Python 3.12..."
 if ! command -v python3.12 &>/dev/null; then
   info "Устанавливаю Python 3.12..."
-  # Определяем версию Ubuntu
   UBUNTU_VER=$(lsb_release -rs 2>/dev/null | cut -d'.' -f1 || echo "0")
   if [[ "$UBUNTU_VER" -ge 24 ]]; then
-    # Ubuntu 24+: python3.12 есть в стандартных репах
     apt-get install -y python3.12 python3.12-venv -qq
   else
-    # Ubuntu 22 и старше: нужен deadsnakes ppa
     apt-get install -y software-properties-common -qq
     add-apt-repository -y ppa:deadsnakes/ppa > /dev/null 2>&1
     apt-get update -qq
@@ -151,7 +169,6 @@ if ! command -v python3.12 &>/dev/null; then
   success "Python 3.12 установлен"
 else
   success "Python $(python3.12 --version | cut -d' ' -f2) уже установлен"
-  # Всегда доставляем python3.12-venv — он может отсутствовать даже если python есть
   apt-get install -y python3.12-venv -qq
 fi
 
@@ -177,7 +194,6 @@ fi
 step "Зависимости"
 if [[ -f "$BOT_DIR/requirements.txt" ]]; then
   info "Устанавливаю пакеты из requirements.txt..."
-  # Убираем кастомные индексы из requirements.txt (китайские зеркала и т.д.)
   sed -i '/^-i /d; /^--index-url/d; /^--extra-index-url/d; / -i http/d' "$BOT_DIR/requirements.txt"
   "$BOT_DIR/venv/bin/pip" install --upgrade pip -q -i https://pypi.org/simple
   "$BOT_DIR/venv/bin/pip" install -r "$BOT_DIR/requirements.txt" -q -i https://pypi.org/simple
@@ -190,12 +206,12 @@ fi
 step "Настройка запуска"
 info "Создаю wrapper-скрипт..."
 
-cat > "${BOT_DIR}/run.sh" << 'WRAPPER'
+cat > "${BOT_DIR}/run.sh" << WRAPPER
 #!/bin/bash
 export PYTHONUNBUFFERED=1
 export TERM=xterm-256color
-cd /root/playerokuniversal
-exec /root/playerokuniversal/venv/bin/python - << 'PYEOF'
+cd ${BOT_DIR}
+exec ${BOT_DIR}/venv/bin/python - << 'PYEOF'
 import colorama.ansitowin32 as _a32
 class _FakeWinTerm:
     def set_title(self, t): pass
@@ -208,8 +224,8 @@ _a32.winterm = _FakeWinTerm()
 import colorama
 colorama.init()
 import runpy, sys
-sys.argv = ['/root/playerokuniversal/bot.py']
-runpy.run_path('/root/playerokuniversal/bot.py', run_name='__main__')
+sys.argv = ['${BOT_DIR}/bot.py']
+runpy.run_path('${BOT_DIR}/bot.py', run_name='__main__')
 PYEOF
 WRAPPER
 
@@ -246,122 +262,163 @@ success "Systemd-сервис зарегистрирован"
 # ── 9. Команда pluniversal ───────────────────────────────────
 info "Устанавливаю команду '${CMD}'..."
 
-cat > /usr/local/bin/$CMD << 'BOTCMD'
+cat > /usr/local/bin/$CMD << BOTCMD
 #!/bin/bash
-SERVICE="playerokuniversal"
-BOT_DIR="/root/playerokuniversal"
-CONFIG="$BOT_DIR/bot_settings/config.json"
+SERVICE="${BOT_NAME}"
+BOT_DIR="${BOT_DIR}"
+REPO="${REPO}"
+CONFIG="\$BOT_DIR/bot_settings/config.json"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-GRAY='\033[0;90m'
-NC='\033[0m'
-BOLD='\033[1m'
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+CYAN='\\033[0;36m'
+WHITE='\\033[1;37m'
+GRAY='\\033[0;90m'
+NC='\\033[0m'
+BOLD='\\033[1m'
 
 is_configured() {
-  [[ -f "$CONFIG" ]] || return 1
-  cookies=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c['playerok']['api']['cookies'])" 2>/dev/null)
-  token=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c['telegram']['api']['token'])" 2>/dev/null)
-  password=$(python3 -c "import json; c=json.load(open('$CONFIG')); print(c['telegram']['bot']['password'])" 2>/dev/null)
-  [[ -n "$cookies" && -n "$token" && -n "$password" ]]
+  [[ -f "\$CONFIG" ]] || return 1
+  cookies=\$(python3 -c "import json; c=json.load(open('\$CONFIG')); print(c['playerok']['api']['cookies'])" 2>/dev/null)
+  token=\$(python3 -c "import json; c=json.load(open('\$CONFIG')); print(c['telegram']['api']['token'])" 2>/dev/null)
+  password=\$(python3 -c "import json; c=json.load(open('\$CONFIG')); print(c['telegram']['bot']['password'])" 2>/dev/null)
+  [[ -n "\$cookies" && -n "\$token" && -n "\$password" ]]
 }
 
-case "$1" in
+download_update() {
+  LATEST_URL=\$(curl -s "https://api.github.com/repos/\${REPO}/releases/latest" | grep '"zipball_url"' | cut -d'"' -f4 || true)
+  if [[ -z "\$LATEST_URL" ]]; then
+    LATEST_URL="https://github.com/\${REPO}/archive/refs/heads/main.zip"
+  fi
+  curl -sL "\$LATEST_URL" -o /tmp/bot_update.zip
+
+  if [[ -d "\$BOT_DIR/bot_settings" ]]; then
+    cp -r "\$BOT_DIR/bot_settings" /tmp/bot_settings_backup
+  fi
+  if [[ -d "\$BOT_DIR/venv" ]]; then
+    mv "\$BOT_DIR/venv" /tmp/bot_venv_backup
+  fi
+  if [[ -f "\$BOT_DIR/run.sh" ]]; then
+    cp "\$BOT_DIR/run.sh" /tmp/bot_run_backup
+  fi
+
+  rm -rf /tmp/bot_extract
+  unzip -q /tmp/bot_update.zip -d /tmp/bot_extract
+  EXTRACTED=\$(ls /tmp/bot_extract | head -1)
+  rm -rf "\$BOT_DIR"
+  mv "/tmp/bot_extract/\$EXTRACTED" "\$BOT_DIR"
+
+  if [[ -d "/tmp/bot_settings_backup" ]]; then
+    cp -r /tmp/bot_settings_backup "\$BOT_DIR/bot_settings"
+    rm -rf /tmp/bot_settings_backup
+  fi
+  if [[ -d "/tmp/bot_venv_backup" ]]; then
+    mv /tmp/bot_venv_backup "\$BOT_DIR/venv"
+  fi
+  if [[ -f "/tmp/bot_run_backup" ]]; then
+    mv /tmp/bot_run_backup "\$BOT_DIR/run.sh"
+    chmod +x "\$BOT_DIR/run.sh"
+  fi
+
+  rm -f /tmp/bot_update.zip
+  rm -rf /tmp/bot_extract
+}
+
+case "\$1" in
   start)
     if ! is_configured; then
       echo ""
-      echo -e "  ${YELLOW}⚠  Бот не настроен!${NC}"
-      echo -e "  ${GRAY}Запустите настройку:${NC} ${CYAN}pluniversal setup${NC}"
+      echo -e "  \${YELLOW}⚠  Бот не настроен!\${NC}"
+      echo -e "  \${GRAY}Запустите настройку:\${NC} \${CYAN}pluniversal setup\${NC}"
       echo ""
       exit 1
     fi
-    systemctl start "$SERVICE"
+    systemctl start "\$SERVICE"
     echo ""
-    echo -e "  ${GREEN}✔${NC}  Бот запущен"
-    echo -e "  ${GRAY}Логи:${NC} pluniversal log"
+    echo -e "  \${GREEN}✔\${NC}  Бот запущен"
+    echo -e "  \${GRAY}Логи:\${NC} pluniversal log"
     echo ""
     ;;
   stop)
-    systemctl stop "$SERVICE"
+    systemctl stop "\$SERVICE"
     echo ""
-    echo -e "  ${RED}■${NC}  Бот остановлен"
+    echo -e "  \${RED}■\${NC}  Бот остановлен"
     echo ""
     ;;
   restart)
     if ! is_configured; then
       echo ""
-      echo -e "  ${YELLOW}⚠  Бот не настроен!${NC}"
-      echo -e "  ${GRAY}Запустите настройку:${NC} ${CYAN}pluniversal setup${NC}"
+      echo -e "  \${YELLOW}⚠  Бот не настроен!\${NC}"
+      echo -e "  \${GRAY}Запустите настройку:\${NC} \${CYAN}pluniversal setup\${NC}"
       echo ""
       exit 1
     fi
-    systemctl restart "$SERVICE"
+    systemctl restart "\$SERVICE"
     echo ""
-    echo -e "  ${CYAN}↺${NC}  Бот перезапущен"
-    echo -e "  ${GRAY}Логи:${NC} pluniversal log"
+    echo -e "  \${CYAN}↺\${NC}  Бот перезапущен"
+    echo -e "  \${GRAY}Логи:\${NC} pluniversal log"
     echo ""
     ;;
   status)
     echo ""
-    IS_ACTIVE=$(systemctl is-active "$SERVICE" 2>/dev/null)
-    IS_ENABLED=$(systemctl is-enabled "$SERVICE" 2>/dev/null)
+    IS_ACTIVE=\$(systemctl is-active "\$SERVICE" 2>/dev/null)
+    IS_ENABLED=\$(systemctl is-enabled "\$SERVICE" 2>/dev/null)
 
-    if [[ "$IS_ACTIVE" == "active" ]]; then
-      STATUS_ICON="${GREEN}●${NC}"
-      STATUS_TEXT="${GREEN}${BOLD}запущен${NC}"
+    if [[ "\$IS_ACTIVE" == "active" ]]; then
+      STATUS_ICON="\${GREEN}●\${NC}"
+      STATUS_TEXT="\${GREEN}\${BOLD}запущен\${NC}"
     else
-      STATUS_ICON="${RED}●${NC}"
-      STATUS_TEXT="${RED}${BOLD}остановлен${NC}"
+      STATUS_ICON="\${RED}●\${NC}"
+      STATUS_TEXT="\${RED}\${BOLD}остановлен\${NC}"
     fi
 
-    if [[ "$IS_ENABLED" == "enabled" ]]; then
-      AUTOSTART="${GREEN}включён${NC}"
+    if [[ "\$IS_ENABLED" == "enabled" ]]; then
+      AUTOSTART="\${GREEN}включён\${NC}"
     else
-      AUTOSTART="${YELLOW}выключен${NC}"
+      AUTOSTART="\${YELLOW}выключен\${NC}"
     fi
 
-    echo -e "  ${STATUS_ICON}  Playerok Universal — ${STATUS_TEXT}"
+    echo -e "  \${STATUS_ICON}  Playerok Universal — \${STATUS_TEXT}"
     echo ""
-    echo -e "  ${GRAY}Автозапуск:${NC}  $AUTOSTART"
+    echo -e "  \${GRAY}Автозапуск:\${NC}  \$AUTOSTART"
+    echo -e "  \${GRAY}Репозиторий:\${NC}  \${CYAN}\${REPO}\${NC}"
 
-    if [[ "$IS_ACTIVE" == "active" ]]; then
-      UPTIME=$(systemctl show "$SERVICE" --property=ActiveEnterTimestamp | cut -d= -f2)
-      echo -e "  ${GRAY}Запущен:${NC}     $UPTIME"
+    if [[ "\$IS_ACTIVE" == "active" ]]; then
+      UPTIME=\$(systemctl show "\$SERVICE" --property=ActiveEnterTimestamp | cut -d= -f2)
+      echo -e "  \${GRAY}Запущен:\${NC}     \$UPTIME"
     fi
 
     if is_configured; then
-      echo -e "  ${GRAY}Конфиг:${NC}      ${GREEN}заполнен${NC}"
+      echo -e "  \${GRAY}Конфиг:\${NC}      \${GREEN}заполнен\${NC}"
     else
-      echo -e "  ${GRAY}Конфиг:${NC}      ${YELLOW}не заполнен${NC}  › pluniversal setup"
+      echo -e "  \${GRAY}Конфиг:\${NC}      \${YELLOW}не заполнен\${NC}  › pluniversal setup"
     fi
     echo ""
     ;;
   log | logs)
     echo ""
-    echo -e "  ${GRAY}Playerok Universal — живые логи  ${NC}${CYAN}(Ctrl+C для выхода)${NC}"
-    echo -e "  ${GRAY}$(printf '─%.0s' {1..44})${NC}"
+    echo -e "  \${GRAY}Playerok Universal — живые логи  \${NC}\${CYAN}(Ctrl+C для выхода)\${NC}"
+    echo -e "  \${GRAY}\$(printf '─%.0s' {1..44})\${NC}"
     echo ""
-    journalctl -u "$SERVICE" -f --output=cat
+    journalctl -u "\$SERVICE" -f --output=cat
     ;;
   log100)
     echo ""
-    echo -e "  ${GRAY}Playerok Universal — последние 100 строк${NC}"
-    echo -e "  ${GRAY}$(printf '─%.0s' {1..44})${NC}"
+    echo -e "  \${GRAY}Playerok Universal — последние 100 строк\${NC}"
+    echo -e "  \${GRAY}\$(printf '─%.0s' {1..44})\${NC}"
     echo ""
-    journalctl -u "$SERVICE" -n 100 --output=cat
+    journalctl -u "\$SERVICE" -n 100 --output=cat
     ;;
   setup)
     echo ""
-    echo -e "  ${CYAN}${BOLD}Первоначальная настройка Playerok Universal${NC}"
-    echo -e "  ${GRAY}$(printf '─%.0s' {1..44})${NC}"
+    echo -e "  \${CYAN}\${BOLD}Первоначальная настройка Playerok Universal\${NC}"
+    echo -e "  \${GRAY}\$(printf '─%.0s' {1..44})\${NC}"
     echo ""
-    systemctl stop "$SERVICE" 2>/dev/null || true
-    cd "$BOT_DIR"
+    systemctl stop "\$SERVICE" 2>/dev/null || true
+    cd "\$BOT_DIR"
     export TERM=xterm-256color
-    /root/playerokuniversal/venv/bin/python -c "
+    "\$BOT_DIR/venv/bin/python" -c "
 import colorama.ansitowin32 as _a32
 class _FakeWinTerm:
     def set_title(self, t): pass
@@ -372,78 +429,65 @@ class _FakeWinTerm:
     def style(self, *a, **k): pass
 _a32.winterm = _FakeWinTerm()
 import colorama; colorama.init()
-import sys; sys.path.insert(0, '/root/playerokuniversal')
+import sys; sys.path.insert(0, '\$BOT_DIR')
 from utils import configure_config
 configure_config()
 "
     echo ""
-    echo -e "  ${GREEN}✔${NC}  Настройка завершена — запускаю бота..."
-    systemctl start "$SERVICE"
+    echo -e "  \${GREEN}✔\${NC}  Настройка завершена — запускаю бота..."
+    systemctl start "\$SERVICE"
     sleep 1
-    if systemctl is-active --quiet "$SERVICE"; then
-      echo -e "  ${GREEN}✔${NC}  Бот запущен успешно"
-      echo -e "  ${GRAY}Логи:${NC} pluniversal log"
+    if systemctl is-active --quiet "\$SERVICE"; then
+      echo -e "  \${GREEN}✔\${NC}  Бот запущен успешно"
+      echo -e "  \${GRAY}Логи:\${NC} pluniversal log"
     else
-      echo -e "  ${RED}✘${NC}  Не удалось запустить. Проверьте логи: pluniversal log"
+      echo -e "  \${RED}✘\${NC}  Не удалось запустить. Проверьте логи: pluniversal log"
     fi
     echo ""
     ;;
   update)
     echo ""
-    echo -e "  ${CYAN}⬇${NC}  Скачиваю последний релиз с GitHub..."
-    LATEST_URL=$(curl -s "https://api.github.com/repos/alleexxeeyy/playerok-universal/releases/latest" | grep '"zipball_url"' | cut -d'"' -f4)
-    if [[ -z "$LATEST_URL" ]]; then
-      LATEST_URL="https://github.com/alleexxeeyy/playerok-universal/archive/refs/heads/main.zip"
+    echo -e "  \${CYAN}⬇\${NC}  Скачиваю обновление с GitHub (\${REPO})..."
+    download_update
+    echo -e "  \${CYAN}◈\${NC}  Обновляю зависимости..."
+    if [[ -f "\$BOT_DIR/venv/bin/pip" ]]; then
+      "\$BOT_DIR/venv/bin/pip" install -r "\$BOT_DIR/requirements.txt" -q -i https://pypi.org/simple
+    else
+      echo -e "  \${YELLOW}⚠\${NC}  venv не найден — пересоздайте установку через install.sh"
     fi
-    curl -sL "$LATEST_URL" -o /tmp/bot_update.zip
-    if [[ -d "/root/playerokuniversal/bot_settings" ]]; then
-      cp -r "/root/playerokuniversal/bot_settings" /tmp/bot_settings_backup
-    fi
-    rm -rf /tmp/bot_extract
-    unzip -q /tmp/bot_update.zip -d /tmp/bot_extract
-    EXTRACTED=$(ls /tmp/bot_extract | head -1)
-    rm -rf "/root/playerokuniversal"
-    mv "/tmp/bot_extract/$EXTRACTED" "/root/playerokuniversal"
-    if [[ -d "/tmp/bot_settings_backup" ]]; then
-      cp -r /tmp/bot_settings_backup "/root/playerokuniversal/bot_settings"
-      rm -rf /tmp/bot_settings_backup
-    fi
-    rm -f /tmp/bot_update.zip
-    echo -e "  ${CYAN}◈${NC}  Обновляю зависимости..."
-    /root/playerokuniversal/venv/bin/pip install -r /root/playerokuniversal/requirements.txt -q
-    systemctl restart "$SERVICE"
+    systemctl restart "\$SERVICE"
     echo ""
-    echo -e "  ${GREEN}✔${NC}  Бот обновлён и перезапущен"
-    echo -e "  ${GRAY}Логи:${NC} pluniversal log"
+    echo -e "  \${GREEN}✔\${NC}  Бот обновлён и перезапущен"
+    echo -e "  \${GRAY}Логи:\${NC} pluniversal log"
     echo ""
     ;;
   enable)
-    systemctl enable "$SERVICE" 2>/dev/null
+    systemctl enable "\$SERVICE" 2>/dev/null
     echo ""
-    echo -e "  ${GREEN}✔${NC}  Автозапуск при старте сервера включён"
+    echo -e "  \${GREEN}✔\${NC}  Автозапуск при старте сервера включён"
     echo ""
     ;;
   disable)
-    systemctl disable "$SERVICE" 2>/dev/null
+    systemctl disable "\$SERVICE" 2>/dev/null
     echo ""
-    echo -e "  ${YELLOW}■${NC}  Автозапуск отключён"
+    echo -e "  \${YELLOW}■\${NC}  Автозапуск отключён"
     echo ""
     ;;
   *)
     echo ""
-    echo -e "  ${CYAN}${BOLD}Playerok Universal${NC}  ${GRAY}управление ботом${NC}"
-    echo -e "  ${GRAY}$(printf '─%.0s' {1..44})${NC}"
+    echo -e "  \${CYAN}\${BOLD}Playerok Universal\${NC}  \${GRAY}управление ботом\${NC}"
+    echo -e "  \${GRAY}\$(printf '─%.0s' {1..44})\${NC}"
     echo ""
-    echo -e "  ${CYAN}pluniversal setup${NC}    ${GRAY}→${NC}  первоначальная настройка"
-    echo -e "  ${CYAN}pluniversal start${NC}    ${GRAY}→${NC}  запустить бота"
-    echo -e "  ${CYAN}pluniversal stop${NC}     ${GRAY}→${NC}  остановить бота"
-    echo -e "  ${CYAN}pluniversal restart${NC}  ${GRAY}→${NC}  перезапустить бота"
-    echo -e "  ${CYAN}pluniversal status${NC}   ${GRAY}→${NC}  статус и информация"
-    echo -e "  ${CYAN}pluniversal log${NC}      ${GRAY}→${NC}  живые логи  ${GRAY}(Ctrl+C для выхода)${NC}"
-    echo -e "  ${CYAN}pluniversal log100${NC}   ${GRAY}→${NC}  последние 100 строк"
-    echo -e "  ${CYAN}pluniversal update${NC}   ${GRAY}→${NC}  обновить с GitHub"
-    echo -e "  ${CYAN}pluniversal enable${NC}   ${GRAY}→${NC}  включить автозапуск"
-    echo -e "  ${CYAN}pluniversal disable${NC}  ${GRAY}→${NC}  выключить автозапуск"
+    echo -e "  \${CYAN}pluniversal setup\${NC}    \${GRAY}→\${NC}  первоначальная настройка"
+    echo -e "  \${CYAN}pluniversal start\${NC}    \${GRAY}→\${NC}  запустить бота"
+    echo -e "  \${CYAN}pluniversal stop\${NC}     \${GRAY}→\${NC}  остановить бота"
+    echo -e "  \${CYAN}pluniversal restart\${NC}  \${GRAY}→\${NC}  перезапустить бота"
+    echo -e "  \${CYAN}pluniversal status\${NC}   \${GRAY}→\${NC}  статус и информация"
+    echo -e "  \${CYAN}pluniversal log\${NC}      \${GRAY}→\${NC}  живые логи  \${GRAY}(Ctrl+C для выхода)\${NC}"
+    echo -e "  \${CYAN}pluniversal log100\${NC}   \${GRAY}→\${NC}  последние 100 строк"
+    echo -e "  \${CYAN}pluniversal update\${NC}   \${GRAY}→\${NC}  обновить с GitHub (\${REPO})"
+    echo -e "  \${CYAN}pluniversal enable\${NC}   \${GRAY}→\${NC}  включить автозапуск"
+    echo -e "  \${CYAN}pluniversal disable\${NC}  \${GRAY}→\${NC}  выключить автозапуск"
     echo ""
     ;;
 esac
@@ -488,6 +532,8 @@ echo ""
 echo -e "  ${GRAY}$(printf '═%.0s' {1..48})${NC}"
 echo ""
 echo -e "  ${GREEN}${BOLD}Установка завершена успешно!${NC}"
+echo ""
+echo -e "  ${GRAY}Репозиторий:${NC} github.com/${REPO}"
 echo ""
 
 if [[ "$CONFIGURED" == "false" ]]; then
