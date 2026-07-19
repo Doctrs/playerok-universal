@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Router
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -16,6 +18,7 @@ from .page import *
 
 
 router = Router()
+logger = logging.getLogger("universal.telegram")
 
 
 @router.callback_query(calls.FastSendFastReply.filter())
@@ -91,13 +94,23 @@ async def callback_fast_change_deal_status(callback: CallbackQuery, callback_dat
         status_str = callback_data.st
 
         from plbot.playerokbot import get_playerok_bot as plbot
-        acc = plbot().account
+        bot = plbot()
+        acc = bot.account
 
         status = ItemDealStatuses.__members__.get(status_str)
-        acc.update_deal(deal_id, status)
+        deal = acc.update_deal(deal_id, status)
 
         if status == ItemDealStatuses.SENT:
             text = "✅ Сделка <b>успешно подтверждена</b>"
+            try:
+                chat = acc.get_chat(deal.chat.id)
+                bot.send_deal_sent_message(deal, chat)
+            except Exception as e:
+                logger.error(
+                    "Статус сделки %s изменён, но сообщение deal_sent не отправлено: %s",
+                    deal_id,
+                    e
+                )
         elif status == ItemDealStatuses.ROLLED_BACK:
             text = "✅ По сделке <b>успешно оформлен возврат</b>"
 

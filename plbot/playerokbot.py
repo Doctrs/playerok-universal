@@ -3,7 +3,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 import pytz
-from threading import Thread
+from threading import Lock, Thread
 import textwrap
 import shutil
 import copy
@@ -91,6 +91,8 @@ class PlayerokBot:
         ).get()
 
         self.__saved_chats: dict[str, Chat] = {}
+        self._deal_sent_message_ids: set[str] = set()
+        self._deal_sent_message_lock = Lock()
 
     def get_chat_by_id(self, chat_id: str) -> Chat:
         if chat_id in self.__saved_chats:
@@ -1045,17 +1047,32 @@ class PlayerokBot:
             
             self.restore_item(item)
 
-    async def _on_item_sent(self, event: ItemSentEvent):
-        if event.deal.user.id == self.account.id:
+    def send_deal_sent_message(self, deal: ItemDeal, chat: Chat):
+        if deal.user.id == self.account.id:
             return
-        
-        self.send_message(event.chat.id, self.msg(
+
+        text = self.msg(
             "deal_sent", 
-            user=msg_user_from_chat(event.chat),
-            chat=msg_chat(event.chat),
-            deal=msg_deal(event.deal),
-            item=msg_item(event.deal.item)
-        ))
+            user=msg_user_from_chat(chat),
+            chat=msg_chat(chat),
+            deal=msg_deal(deal),
+            item=msg_item(deal.item)
+        )
+        if not text:
+            return
+
+        with self._deal_sent_message_lock:
+            if deal.id in self._deal_sent_message_ids:
+                return
+            self._deal_sent_message_ids.add(deal.id)
+
+        if self.send_message(chat.id, text) is None:
+            # Разрешаем повторную попытку, если непосредственная отправка не удалась.
+            with self._deal_sent_message_lock:
+                self._deal_sent_message_ids.discard(deal.id)
+
+    async def _on_item_sent(self, event: ItemSentEvent):
+        self.send_deal_sent_message(event.deal, event.chat)
 
     async def _on_deal_status_changed(self, event: DealStatusChangedEvent):
         if event.deal.user.id == self.account.id:
