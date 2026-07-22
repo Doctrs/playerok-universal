@@ -325,6 +325,137 @@ async def callback_enter_new_excluded_bump_item_keyphrases(callback: CallbackQue
         ),
         reply_markup=templ.back_kb(calls.ExcludedBumpItemsPagination(page=last_page).pack())
     )
+
+
+@router.callback_query(F.data == "enter_new_bump_group_name")
+async def callback_enter_new_bump_group_name(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    last_page = data.get("last_page", 0)
+
+    await state.set_state(states.BumpItemsStates.waiting_for_new_bump_group_name)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.new_bump_group_float_text("✏️ Введите <b>название группы</b>:"),
+        reply_markup=templ.back_kb(calls.BumpGroupsPagination(page=last_page).pack())
+    )
+
+
+@router.callback_query(F.data == "enter_bump_group_name")
+async def callback_enter_bump_group_name(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    index = data.get("bump_group_index")
+    if index is None:
+        return
+
+    auto_bump_items = sett.get("auto_bump_items")
+    groups = auto_bump_items.get("groups", [])
+    if index < 0 or index >= len(groups):
+        return
+    name = groups[index].get("name") or "❌ Не указано"
+
+    await state.set_state(states.BumpItemsStates.waiting_for_bump_group_name)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_page_float_text(
+            f"✏️ Введите <b>новое название группы</b>:"
+            f"\n\n・ <b>Текущее:</b> <code>{name}</code>"
+        ),
+        reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+    )
+
+
+@router.callback_query(F.data == "enter_bump_group_interval")
+async def callback_enter_bump_group_interval(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    index = data.get("bump_group_index")
+    if index is None:
+        return
+
+    auto_bump_items = sett.get("auto_bump_items")
+    groups = auto_bump_items.get("groups", [])
+    if index < 0 or index >= len(groups):
+        return
+    interval = groups[index].get("interval", 3600)
+
+    await state.set_state(states.BumpItemsStates.waiting_for_bump_group_interval)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_page_float_text(
+            f"⏰ Введите <b>интервал поднятия товаров</b> группы:"
+            f"\n\n・ <b>Текущее:</b> <code>{interval}</code> сек."
+        ),
+        reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+    )
+
+
+@router.callback_query(F.data == "enter_bump_group_below_position")
+async def callback_enter_bump_group_below_position(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    index = data.get("bump_group_index")
+    if index is None:
+        return
+
+    auto_bump_items = sett.get("auto_bump_items")
+    groups = auto_bump_items.get("groups", [])
+    if index < 0 or index >= len(groups):
+        return
+    below_position = groups[index].get("below_position", 0)
+
+    await state.set_state(states.BumpItemsStates.waiting_for_bump_group_below_position)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_page_float_text(
+            f"📍 Введите позицию: товар будет подниматься <b>только если его позиция ниже</b> этого числа."
+            f"\n\n・ <b>0</b> — без ограничения (поднимать всегда)"
+            f"\n・ Например, <b>5</b> — поднимать с 6-й позиции и ниже"
+            f"\n\n・ <b>Текущее:</b> <code>{below_position}</code>"
+        ),
+        reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+    )
+
+
+@router.callback_query(F.data == "enter_new_included_bump_group_item_keyphrases")
+async def callback_enter_new_included_bump_group_item_keyphrases(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    group_index = data.get("bump_group_index")
+    last_page = data.get("last_page", 0)
+    if group_index is None:
+        return
+
+    await state.set_state(states.BumpItemsStates.waiting_for_new_included_bump_group_item_keyphrases)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.new_bump_group_included_float_text(
+            f"🔑 Введите <b>ключевые фразы</b> названия товара, который нужно включить в группу "
+            f"(указываются через запятую, например, \"samp аккаунт, со всеми данными\"):"
+        ),
+        reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+    )
+
+
+@router.callback_query(F.data == "enter_new_excluded_bump_group_item_keyphrases")
+async def callback_enter_new_excluded_bump_group_item_keyphrases(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    group_index = data.get("bump_group_index")
+    last_page = data.get("last_page", 0)
+    if group_index is None:
+        return
+
+    await state.set_state(states.BumpItemsStates.waiting_for_new_excluded_bump_group_item_keyphrases)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.new_bump_group_excluded_float_text(
+            f"🔑 Введите <b>ключевые фразы</b> названия товара, который нужно исключить из группы "
+            f"(указываются через запятую, например, \"samp аккаунт, со всеми данными\"):"
+        ),
+        reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+    )
         
 
 @router.callback_query(F.data == "enter_custom_commands_page")

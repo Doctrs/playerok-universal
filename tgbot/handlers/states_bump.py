@@ -240,3 +240,375 @@ async def handler_waiting_for_new_excluded_bump_items_keyphrases_file(message: t
             text=templ.new_bump_excluded_float_text(e), 
             reply_markup=templ.back_kb(calls.ExcludedBumpItemsPagination(page=last_page).pack())
         )
+
+
+@router.message(states.BumpItemsStates.waiting_for_new_bump_group_name, F.text)
+async def handler_waiting_for_new_bump_group_name(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        name = message.text.strip()
+        if len(name) <= 0:
+            raise Exception("❌ Слишком короткое значение")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        if "groups" not in auto_bump_items:
+            auto_bump_items["groups"] = []
+
+        auto_bump_items["groups"].append({
+            "name": name,
+            "enabled": True,
+            "interval": 3600,
+            "below_position": 0,
+            "all": False,
+            "last_time": "",
+            "included": [],
+            "excluded": [],
+        })
+        sett.set("auto_bump_items", auto_bump_items)
+
+        index = len(auto_bump_items["groups"]) - 1
+        await state.update_data(bump_group_index=index)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_float_text(f"✅ Группа <b>{name}</b> успешно создана"),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupsPagination(page=last_page).pack())
+        )
+
+
+@router.message(states.BumpItemsStates.waiting_for_bump_group_name, F.text)
+async def handler_waiting_for_bump_group_name(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        name = message.text.strip()
+        if len(name) <= 0:
+            raise Exception("❌ Слишком короткое значение")
+
+        data = await state.get_data()
+        index = data.get("bump_group_index")
+        if index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if index < 0 or index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[index]["name"] = name
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(f"✅ Название группы изменено на <b>{name}</b>"),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        index = data.get("bump_group_index", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+
+
+@router.message(states.BumpItemsStates.waiting_for_bump_group_interval, F.text)
+async def handler_waiting_for_bump_group_interval(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        if not message.text.isdigit():
+            raise Exception("❌ Вы должны ввести числовое значение")
+        if int(message.text) <= 0:
+            raise Exception("❌ Слишком низкое значение")
+
+        interval = int(message.text)
+        data = await state.get_data()
+        index = data.get("bump_group_index")
+        if index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if index < 0 or index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[index]["interval"] = interval
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(f"✅ Интервал группы изменён на <b>{interval}</b> сек."),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        index = data.get("bump_group_index", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+
+
+@router.message(states.BumpItemsStates.waiting_for_bump_group_below_position, F.text)
+async def handler_waiting_for_bump_group_below_position(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        if not message.text.isdigit():
+            raise Exception("❌ Вы должны ввести числовое значение")
+
+        below_position = int(message.text)
+        data = await state.get_data()
+        index = data.get("bump_group_index")
+        if index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if index < 0 or index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[index]["below_position"] = below_position
+        sett.set("auto_bump_items", auto_bump_items)
+
+        if below_position:
+            result_text = (
+                f"✅ Товары группы будут подниматься только если позиция <b>ниже {below_position}</b> "
+                f"(с {below_position + 1}-й и дальше)"
+            )
+        else:
+            result_text = "✅ Ограничение по позиции <b>отключено</b> — товары группы будут подниматься всегда"
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(result_text),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        index = data.get("bump_group_index", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.bump_group_page_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupPage(index=index).pack())
+        )
+
+
+@router.message(states.BumpItemsStates.waiting_for_new_included_bump_group_item_keyphrases, F.text)
+async def handler_waiting_for_new_included_bump_group_item_keyphrases(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        if len(message.text) <= 0:
+            raise Exception("❌ Слишком короткое значение")
+
+        keyphrases = [phrase.strip() for phrase in message.text.split(",") if phrase.strip()]
+        data = await state.get_data()
+        group_index = data.get("bump_group_index")
+        last_page = data.get("last_page", 0)
+        if group_index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[group_index].setdefault("included", []).append(keyphrases)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_included_float_text(
+                f"✅ Товар с ключевыми фразами <code>{'</code>, <code>'.join(keyphrases)}</code> успешно включён в группу"
+            ),
+            reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        group_index = data.get("bump_group_index", 0)
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_included_float_text(e),
+            reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+
+
+@router.message(
+    states.BumpItemsStates.waiting_for_new_included_bump_group_items_keyphrases_file,
+    F.document.file_name.lower().endswith('.txt')
+)
+async def handler_waiting_for_new_included_bump_group_items_keyphrases_file(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        file = await message.bot.get_file(message.document.file_id)
+        downloaded_file = await message.bot.download_file(file.file_path)
+        file_content = downloaded_file.read().decode('utf-8')
+
+        keyphrases_list = []
+        for line in file_content.splitlines():
+            line = line.strip()
+            if len(line) > 0:
+                keyphrases = [phrase.strip() for phrase in line.split(",") if phrase.strip()]
+                if len(keyphrases) > 0:
+                    keyphrases_list.append(keyphrases)
+
+        if len(keyphrases_list) <= 0:
+            raise Exception("❌ Файл не содержит валидных ключевых фраз")
+
+        data = await state.get_data()
+        group_index = data.get("bump_group_index")
+        last_page = data.get("last_page", 0)
+        if group_index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[group_index].setdefault("included", []).extend(keyphrases_list)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_included_float_text(
+                f"✅ Успешно включено <b>{len(keyphrases_list)}</b> товаров из файла в группу"
+            ),
+            reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        group_index = data.get("bump_group_index", 0)
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_included_float_text(e),
+            reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+
+
+@router.message(states.BumpItemsStates.waiting_for_new_excluded_bump_group_item_keyphrases, F.text)
+async def handler_waiting_for_new_excluded_bump_group_item_keyphrases(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        if len(message.text) <= 0:
+            raise Exception("❌ Слишком короткое значение")
+
+        keyphrases = [phrase.strip() for phrase in message.text.split(",") if phrase.strip()]
+        data = await state.get_data()
+        group_index = data.get("bump_group_index")
+        last_page = data.get("last_page", 0)
+        if group_index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[group_index].setdefault("excluded", []).append(keyphrases)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_excluded_float_text(
+                f"✅ Товар с ключевыми фразами <code>{'</code>, <code>'.join(keyphrases)}</code> успешно добавлен в исключения группы"
+            ),
+            reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        group_index = data.get("bump_group_index", 0)
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_excluded_float_text(e),
+            reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+
+
+@router.message(
+    states.BumpItemsStates.waiting_for_new_excluded_bump_group_items_keyphrases_file,
+    F.document.file_name.lower().endswith('.txt')
+)
+async def handler_waiting_for_new_excluded_bump_group_items_keyphrases_file(message: types.Message, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        file = await message.bot.get_file(message.document.file_id)
+        downloaded_file = await message.bot.download_file(file.file_path)
+        file_content = downloaded_file.read().decode('utf-8')
+
+        keyphrases_list = []
+        for line in file_content.splitlines():
+            line = line.strip()
+            if len(line) > 0:
+                keyphrases = [phrase.strip() for phrase in line.split(",") if phrase.strip()]
+                if len(keyphrases) > 0:
+                    keyphrases_list.append(keyphrases)
+
+        if len(keyphrases_list) <= 0:
+            raise Exception("❌ Файл не содержит валидных ключевых фраз")
+
+        data = await state.get_data()
+        group_index = data.get("bump_group_index")
+        last_page = data.get("last_page", 0)
+        if group_index is None:
+            raise Exception("❌ Группа не выбрана")
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            raise Exception("❌ Группа не найдена")
+
+        groups[group_index].setdefault("excluded", []).extend(keyphrases_list)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_excluded_float_text(
+                f"✅ Успешно добавлено <b>{len(keyphrases_list)}</b> товаров из файла в исключения группы"
+            ),
+            reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+    except Exception as e:
+        data = await state.get_data()
+        group_index = data.get("bump_group_index", 0)
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=message,
+            text=templ.new_bump_group_excluded_float_text(e),
+            reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )

@@ -673,6 +673,188 @@ async def callback_send_new_excluded_bump_items_keyphrases_file(callback: Callba
     )
 
 
+@router.callback_query(F.data == "send_new_included_bump_group_items_keyphrases_file")
+async def callback_send_new_included_bump_group_items_keyphrases_file(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    group_index = data.get("bump_group_index")
+    last_page = data.get("last_page", 0)
+    if group_index is None:
+        return
+
+    await state.set_state(states.BumpItemsStates.waiting_for_new_included_bump_group_items_keyphrases_file)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.new_bump_group_included_float_text(
+            "📄 Отправьте <b>.txt</b> файл с <b>ключевыми фразами</b>, по одной записи в строке "
+            "(для каждого товара указываются через запятую, например, \"samp аккаунт, со всеми данными\")"
+        ),
+        reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+    )
+
+
+@router.callback_query(F.data == "send_new_excluded_bump_group_items_keyphrases_file")
+async def callback_send_new_excluded_bump_group_items_keyphrases_file(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    group_index = data.get("bump_group_index")
+    last_page = data.get("last_page", 0)
+    if group_index is None:
+        return
+
+    await state.set_state(states.BumpItemsStates.waiting_for_new_excluded_bump_group_items_keyphrases_file)
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.new_bump_group_excluded_float_text(
+            "📄 Отправьте <b>.txt</b> файл с <b>ключевыми фразами</b>, по одной записи в строке "
+            "(для каждого товара указываются через запятую, например, \"samp аккаунт, со всеми данными\")"
+        ),
+        reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+    )
+
+
+@router.callback_query(F.data == "confirm_deleting_bump_group")
+async def callback_confirm_deleting_bump_group(callback: CallbackQuery, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        index = data.get("bump_group_index")
+
+        if index is None:
+            return await callback_bump_groups_pagination(
+                callback, calls.BumpGroupsPagination(page=last_page), state
+            )
+
+        await throw_float_message(
+            state=state,
+            message=callback.message,
+            text=templ.bump_group_page_float_text(
+                "🗑️ Подтвердите <b>удаление группы</b>:"
+            ),
+            reply_markup=templ.confirm_kb(
+                confirm_cb="delete_bump_group",
+                cancel_cb=calls.BumpGroupPage(index=index).pack()
+            )
+        )
+    except Exception as e:
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=callback.message,
+            text=templ.bump_group_page_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupsPagination(page=last_page).pack())
+        )
+
+
+@router.callback_query(F.data == "delete_bump_group")
+async def callback_delete_bump_group(callback: CallbackQuery, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        index = data.get("bump_group_index")
+
+        if index is None:
+            return await callback_bump_groups_pagination(
+                callback, calls.BumpGroupsPagination(page=last_page), state
+            )
+
+        auto_bump_items = sett.get("auto_bump_items")
+        auto_bump_items.get("groups", []).pop(index)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        return await callback_bump_groups_pagination(
+            callback, calls.BumpGroupsPagination(page=last_page), state
+        )
+    except Exception as e:
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        await throw_float_message(
+            state=state,
+            message=callback.message,
+            text=templ.bump_groups_float_text(e),
+            reply_markup=templ.back_kb(calls.BumpGroupsPagination(page=last_page).pack())
+        )
+
+
+@router.callback_query(calls.DeleteIncludedBumpGroupItem.filter())
+async def callback_delete_included_bump_group_item(callback: CallbackQuery, callback_data: calls.DeleteIncludedBumpGroupItem, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        group_index = callback_data.group_index
+        index = callback_data.index
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            return await callback_bump_groups_pagination(
+                callback, calls.BumpGroupsPagination(page=last_page), state
+            )
+
+        groups[group_index].get("included", []).pop(index)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        return await callback_included_bump_group_items_pagination(
+            callback,
+            calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page),
+            state
+        )
+    except Exception as e:
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        group_index = callback_data.group_index
+        await throw_float_message(
+            state=state,
+            message=callback.message,
+            text=templ.bump_group_included_float_text(e),
+            reply_markup=templ.back_kb(calls.IncludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+
+
+@router.callback_query(calls.DeleteExcludedBumpGroupItem.filter())
+async def callback_delete_excluded_bump_group_item(callback: CallbackQuery, callback_data: calls.DeleteExcludedBumpGroupItem, state: FSMContext):
+    try:
+        await state.set_state(None)
+
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        group_index = callback_data.group_index
+        index = callback_data.index
+
+        auto_bump_items = sett.get("auto_bump_items")
+        groups = auto_bump_items.get("groups", [])
+        if group_index < 0 or group_index >= len(groups):
+            return await callback_bump_groups_pagination(
+                callback, calls.BumpGroupsPagination(page=last_page), state
+            )
+
+        groups[group_index].get("excluded", []).pop(index)
+        sett.set("auto_bump_items", auto_bump_items)
+
+        return await callback_excluded_bump_group_items_pagination(
+            callback,
+            calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page),
+            state
+        )
+    except Exception as e:
+        data = await state.get_data()
+        last_page = data.get("last_page", 0)
+        group_index = callback_data.group_index
+        await throw_float_message(
+            state=state,
+            message=callback.message,
+            text=templ.bump_group_excluded_float_text(e),
+            reply_markup=templ.back_kb(calls.ExcludedBumpGroupItemsPagination(group_index=group_index, page=last_page).pack())
+        )
+
+
 @router.callback_query(F.data == "add_new_custom_command")
 async def callback_add_new_custom_command(callback: CallbackQuery, state: FSMContext):
     try:

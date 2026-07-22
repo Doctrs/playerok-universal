@@ -126,6 +126,56 @@ async def callback_excluded_bump_items_pagination(callback: CallbackQuery, callb
     )
 
 
+@router.callback_query(calls.BumpGroupsPagination.filter())
+async def callback_bump_groups_pagination(callback: CallbackQuery, callback_data: calls.BumpGroupsPagination, state: FSMContext):
+    await state.set_state(None)
+
+    page = callback_data.page
+    await state.update_data(last_page=page)
+
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_groups_text(),
+        reply_markup=templ.bump_groups_kb(page),
+        callback=callback
+    )
+
+
+@router.callback_query(calls.IncludedBumpGroupItemsPagination.filter())
+async def callback_included_bump_group_items_pagination(callback: CallbackQuery, callback_data: calls.IncludedBumpGroupItemsPagination, state: FSMContext):
+    await state.set_state(None)
+
+    group_index = callback_data.group_index
+    page = callback_data.page
+    await state.update_data(bump_group_index=group_index, last_page=page)
+
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_included_text(group_index),
+        reply_markup=templ.bump_group_included_kb(group_index, page),
+        callback=callback
+    )
+
+
+@router.callback_query(calls.ExcludedBumpGroupItemsPagination.filter())
+async def callback_excluded_bump_group_items_pagination(callback: CallbackQuery, callback_data: calls.ExcludedBumpGroupItemsPagination, state: FSMContext):
+    await state.set_state(None)
+
+    group_index = callback_data.group_index
+    page = callback_data.page
+    await state.update_data(bump_group_index=group_index, last_page=page)
+
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_excluded_text(group_index),
+        reply_markup=templ.bump_group_excluded_kb(group_index, page),
+        callback=callback
+    )
+
+
 @router.callback_query(calls.CustomCommandsPagination.filter())
 async def callback_custom_commands_pagination(callback: CallbackQuery, callback_data: calls.CustomCommandsPagination, state: FSMContext):
     await state.set_state(None)

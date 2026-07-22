@@ -29,6 +29,18 @@ class ExcludedBumpItemsPagination(CallbackData, prefix="exbupag"):
     page: int
 
 
+class BumpGroupsPagination(CallbackData, prefix="bugrpag"):
+    page: int
+
+class IncludedBumpGroupItemsPagination(CallbackData, prefix="inbugrpag"):
+    group_index: int
+    page: int
+
+class ExcludedBumpGroupItemsPagination(CallbackData, prefix="exbugrpag"):
+    group_index: int
+    page: int
+
+
 class CustomCommandsPagination(CallbackData, prefix="cucopag"):
     page: int
 

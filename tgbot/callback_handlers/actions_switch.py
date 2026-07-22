@@ -16,7 +16,8 @@ from ..helpful import throw_float_message
 from ..callback_handlers.page import (
     callback_message_page, 
     callback_module_page,
-    callback_auto_delivery_page
+    callback_auto_delivery_page,
+    callback_bump_group_page
 )
 from .navigation import *
 from .pagination import *
@@ -77,6 +78,46 @@ async def callback_switch_auto_bump_items_all(callback: CallbackQuery, state: FS
     
     return await callback_menu_navigation(
         callback, calls.MenuNavigation(to="bump"), state
+    )
+
+
+@router.callback_query(F.data == "switch_bump_group_enabled")
+async def callback_switch_bump_group_enabled(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    index = data.get("bump_group_index")
+    if index is None:
+        return
+
+    auto_bump_items = sett.get("auto_bump_items")
+    groups = auto_bump_items.get("groups", [])
+    if index < 0 or index >= len(groups):
+        return
+
+    groups[index]["enabled"] = not groups[index].get("enabled", False)
+    sett.set("auto_bump_items", auto_bump_items)
+
+    return await callback_bump_group_page(
+        callback, calls.BumpGroupPage(index=index), state
+    )
+
+
+@router.callback_query(F.data == "switch_bump_group_all")
+async def callback_switch_bump_group_all(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    index = data.get("bump_group_index")
+    if index is None:
+        return
+
+    auto_bump_items = sett.get("auto_bump_items")
+    groups = auto_bump_items.get("groups", [])
+    if index < 0 or index >= len(groups):
+        return
+
+    groups[index]["all"] = not groups[index].get("all", False)
+    sett.set("auto_bump_items", auto_bump_items)
+
+    return await callback_bump_group_page(
+        callback, calls.BumpGroupPage(index=index), state
     )
 
 

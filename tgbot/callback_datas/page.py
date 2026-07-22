@@ -14,6 +14,9 @@ class CustomCommandPage(CallbackData, prefix="cucopage"):
 class AutoDeliveryPage(CallbackData, prefix="audepage"):
     index: int
 
+class BumpGroupPage(CallbackData, prefix="bugrpage"):
+    index: int
+
 
 class ChatPage(CallbackData, prefix="chtpage"):
     id: str

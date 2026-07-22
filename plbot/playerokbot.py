@@ -346,66 +346,100 @@ class PlayerokBot:
         )
 
 
-    def bump_item(self, item: ItemProfile | MyItem):
+    @staticmethod
+    def _match_keyphrases(item_name: str, rules: list) -> bool:
+        return any(
+            all(
+                phrase.lower() in item_name.lower()
+                or item_name.lower() == phrase.lower()
+                for phrase in rule
+            )
+            for rule in (rules or [])
+        )
+
+    def _scope_matches(self, item: ItemProfile | MyItem, scope: dict) -> bool:
+        included = self._match_keyphrases(item.name, scope.get("included", []))
+        excluded = self._match_keyphrases(item.name, scope.get("excluded", []))
+        return (scope.get("all") or included) and not excluded
+
+    def _owning_group_index(self, item: ItemProfile | MyItem) -> int | None:
+        for i, group in enumerate(self.auto_bump_items.get("groups", [])):
+            if group.get("enabled") and self._scope_matches(item, group):
+                return i
+        return None
+
+    def _individual_bump_scope(self) -> dict:
+        cfg = self.config["playerok"]["auto_bump_items"]
+        return {
+            "all": cfg.get("all", False),
+            "included": self.auto_bump_items.get("included", []),
+            "excluded": self.auto_bump_items.get("excluded", []),
+            "below_position": cfg.get("below_position", 0),
+        }
+
+    def bump_item(
+        self,
+        item: ItemProfile | MyItem,
+        scope: dict | None = None,
+        *,
+        owning_group_index: int | None = None,
+        skip_if_in_groups: bool = False,
+    ):
         try:
             name_frmtd = item.name[:32] + ("..." if len(item.name) > 32 else "")
-            
-            included = any(
-                all(
-                    phrase.lower() in item.name.lower()
-                    or item.name.lower() == phrase.lower()
-                    for phrase in included_item
-                )
-                for included_item in self.auto_bump_items["included"]
-            )
-            excluded = any(
-                all(
-                    phrase.lower() in item.name.lower()
-                    or item.name.lower() == phrase.lower()
-                    for phrase in excluded_item
-                )
-                for excluded_item in self.auto_bump_items["excluded"]
-            )
 
-            if (self.config["playerok"]["auto_bump_items"]["all"] or included) and not excluded:
-                if not isinstance(item, MyItem):
-                    try: item = self.account.get_item(item.id)
-                    except: return
+            if scope is None:
+                scope = self._individual_bump_scope()
+                skip_if_in_groups = True
 
-                below_position = self.config["playerok"]["auto_bump_items"].get("below_position", 0)
-                if below_position and item.sequence is not None and item.sequence <= below_position:
-                    logger.info(
-                        f"{Fore.LIGHTWHITE_EX}«{name_frmtd}» {Fore.WHITE}— {Fore.CYAN}пропущен. "
-                        f"{Fore.WHITE}Позиция {Fore.LIGHTWHITE_EX}{item.sequence} "
-                        f"{Fore.WHITE}≤ {Fore.LIGHTWHITE_EX}{below_position}"
-                    )
+            owner_idx = self._owning_group_index(item)
+            if owning_group_index is not None:
+                if owner_idx != owning_group_index:
                     return False
-                    
-                time.sleep(1)
-                statuses = self.account.get_item_priority_statuses(item.id, item.raw_price)
-                
-                prem_status = next((st for st in statuses if st.type == PriorityTypes.PREMIUM or st.price > 0), None)
-                if not prem_status:
-                    raise Exception("PREMIUM статус не найден")
-                
-                time.sleep(1)
-                self.account.increase_item_priority_status(item.id, prem_status.id)
-                    
+            elif skip_if_in_groups and owner_idx is not None:
+                return False
+
+            if not self._scope_matches(item, scope):
+                return False
+
+            if not isinstance(item, MyItem):
+                try: item = self.account.get_item(item.id)
+                except: return
+
+            below_position = scope.get("below_position", 0)
+            if below_position and item.sequence is not None and item.sequence <= below_position:
                 logger.info(
-                    f"{Fore.LIGHTWHITE_EX}«{name_frmtd}» {Fore.WHITE}— {Fore.YELLOW}поднят. "
-                    f"{Fore.WHITE}Позиция: {Fore.LIGHTWHITE_EX}{item.sequence} {Fore.WHITE}→ {Fore.YELLOW}1"
+                    f"{Fore.LIGHTWHITE_EX}«{name_frmtd}» {Fore.WHITE}— {Fore.CYAN}пропущен. "
+                    f"{Fore.WHITE}Позиция {Fore.LIGHTWHITE_EX}{item.sequence} "
+                    f"{Fore.WHITE}≤ {Fore.LIGHTWHITE_EX}{below_position}"
+                )
+                return False
+                
+            time.sleep(1)
+            statuses = self.account.get_item_priority_statuses(item.id, item.raw_price)
+            
+            prem_status = next((st for st in statuses if st.type == PriorityTypes.PREMIUM or st.price > 0), None)
+            if not prem_status:
+                raise Exception("PREMIUM статус не найден")
+            
+            time.sleep(1)
+            self.account.increase_item_priority_status(item.id, prem_status.id)
+                
+            logger.info(
+                f"{Fore.LIGHTWHITE_EX}«{name_frmtd}» {Fore.WHITE}— {Fore.YELLOW}поднят. "
+                f"{Fore.WHITE}Позиция: {Fore.LIGHTWHITE_EX}{item.sequence} {Fore.WHITE}→ {Fore.YELLOW}1"
+            )
+
+            if (
+                self.config["playerok"]["notifications"]["enabled"]
+                and self.config["playerok"]["notifications"]["events"]["item_bumped"]
+            ):
+                self.log_to_tg(
+                    log_text(f'⬆️ Товар <a href="https://playerok.com/products/{item.slug}">«{item.name}»</a> поднят. Позиция: {item.sequence} → 1'),
+                    log_item_kb(item.id)
                 )
 
-                if (
-                    self.config["playerok"]["notifications"]["enabled"]
-                    and self.config["playerok"]["notifications"]["events"]["item_bumped"]
-                ):
-                    self.log_to_tg(
-                        log_text(f'⬆️ Товар <a href="https://playerok.com/products/{item.slug}">«{item.name}»</a> поднят. Позиция: {item.sequence} → 1'),
-                        log_item_kb(item.id)
-                    )
-
-                return True
+            return True
         except Exception as e:
             logger.error(f"{Fore.LIGHTRED_EX}Ошибка при поднятии товара «{name_frmtd}»: {Fore.WHITE}{e}")
             if (
@@ -421,20 +455,55 @@ class PlayerokBot:
                 )
             return False
 
+    def bump_items_for_scope(
+        self,
+        items: list,
+        scope: dict,
+        *,
+        owning_group_index: int | None = None,
+        skip_if_in_groups: bool = False,
+    ) -> int:
+        cnt = 0
+        for item in items:
+            if self.bump_item(
+                item,
+                scope,
+                owning_group_index=owning_group_index,
+                skip_if_in_groups=skip_if_in_groups,
+            ):
+                cnt += 1
+        return cnt
+
     def bump_items(self): 
         try:
-            self.config["playerok"]["auto_bump_items"]["last_time"] = datetime.now().isoformat()
-            sett.set("config", self.config)
-
+            now = datetime.now().isoformat()
             items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
             up_items = [it for it in items if it.priority != PriorityTypes.DEFAULT]
             
             total = len(up_items)
             cnt = 0
-            
-            for item in up_items:
-                if self.bump_item(item):
-                    cnt += 1
+
+            groups = self.auto_bump_items.get("groups", [])
+            groups_changed = False
+            for i, group in enumerate(groups):
+                if not group.get("enabled"):
+                    continue
+                group["last_time"] = now
+                groups_changed = True
+                cnt += self.bump_items_for_scope(
+                    up_items, group, owning_group_index=i
+                )
+
+            if groups_changed:
+                sett.set("auto_bump_items", self.auto_bump_items)
+
+            self.config["playerok"]["auto_bump_items"]["last_time"] = now
+            sett.set("config", self.config)
+            cnt += self.bump_items_for_scope(
+                up_items,
+                self._individual_bump_scope(),
+                skip_if_in_groups=True,
+            )
 
             return True, total, cnt, None
         except Exception as e:
@@ -710,14 +779,50 @@ class PlayerokBot:
 
         def bump_items_loop():
             while True:
-                if (
-                    self.config["playerok"]["auto_bump_items"]["enabled"]
-                    and self._do_call_event(
-                        self.config["playerok"]["auto_bump_items"]["last_time"],
-                        self.config["playerok"]["auto_bump_items"]["interval"]
-                    )
-                ):
-                    self.bump_items()
+                try:
+                    items = None
+                    groups = self.auto_bump_items.get("groups", [])
+                    groups_changed = False
+
+                    for i, group in enumerate(groups):
+                        if (
+                            group.get("enabled")
+                            and self._do_call_event(
+                                group.get("last_time", ""),
+                                group.get("interval", 3600),
+                            )
+                        ):
+                            if items is None:
+                                all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
+                                items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
+                            group["last_time"] = datetime.now().isoformat()
+                            groups_changed = True
+                            self.bump_items_for_scope(
+                                items, group, owning_group_index=i
+                            )
+
+                    if groups_changed:
+                        sett.set("auto_bump_items", self.auto_bump_items)
+
+                    if (
+                        self.config["playerok"]["auto_bump_items"]["enabled"]
+                        and self._do_call_event(
+                            self.config["playerok"]["auto_bump_items"]["last_time"],
+                            self.config["playerok"]["auto_bump_items"]["interval"]
+                        )
+                    ):
+                        if items is None:
+                            all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
+                            items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
+                        self.config["playerok"]["auto_bump_items"]["last_time"] = datetime.now().isoformat()
+                        sett.set("config", self.config)
+                        self.bump_items_for_scope(
+                            items,
+                            self._individual_bump_scope(),
+                            skip_if_in_groups=True,
+                        )
+                except Exception as e:
+                    logger.error(f"{Fore.LIGHTRED_EX}Ошибка в цикле поднятия товаров: {Fore.WHITE}{e}")
                 time.sleep(3)
 
         def withdrawal_loop():

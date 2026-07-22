@@ -191,10 +191,11 @@ AUTO_COMPLETE_DEALS = SettingsFile(
 AUTO_BUMP_ITEMS = SettingsFile(
     name="auto_bump_items",
     path="bot_settings/auto_bump_items.json",
-    need_restore=False,
+    need_restore=True,
     default={
         "included": [],
-        "excluded": []
+        "excluded": [],
+        "groups": []
     }
 )
 FAST_REPLIES = SettingsFile(

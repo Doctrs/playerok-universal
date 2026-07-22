@@ -20,6 +20,7 @@ def bump_text():
     auto_bump_items = sett.get("auto_bump_items")
     included = len(auto_bump_items["included"])
     excluded = len(auto_bump_items["excluded"])
+    groups = len(auto_bump_items.get("groups", []))
 
     last_time_iso = config["playerok"]["auto_bump_items"]["last_time"]
     last_time = datetime.fromisoformat(last_time_iso).strftime("%d.%m.%Y %H:%M:%S") if last_time_iso else "никогда"
@@ -42,8 +43,9 @@ def bump_text():
         <blockquote><b>(?)</b> Если задано число N, товар поднимается только когда его позиция строго ниже N (например, при N=5 — с 6-й позиции и дальше). 0 — без ограничения.</blockquote>
 
         <b>📦 Поднимать:</b> {all}
-        <blockquote><b>(?)</b> Если вы выберете "Все товары", то будут подниматься все товары, кроме исключений. Если "Указанные товары" — только включённые (фразы через запятую — все должны быть в названии), минус исключения.</blockquote>
+        <blockquote><b>(?)</b> Если вы выберете "Все товары", то будут подниматься все товары, кроме исключений. Если "Указанные товары" — только включённые (фразы через запятую — все должны быть в названии), минус исключения. Группы важнее этой индивидуальной настройки.</blockquote>
 
+        <b>📁 Группы:</b> {groups}
         <b>➕ Включенные:</b> {included}
         <b>➖ Исключенные:</b> {excluded}
 
@@ -65,9 +67,11 @@ def bump_kb():
     auto_bump_items = sett.get("auto_bump_items")
     included = len(auto_bump_items["included"])
     excluded = len(auto_bump_items["excluded"])
+    groups = len(auto_bump_items.get("groups", []))
     
     rows = [
         [InlineKeyboardButton(text=f"⬆️ Поднять товары", callback_data="confirm_bump_items")],
+        [InlineKeyboardButton(text=f"📁 Группы: {groups}", callback_data=calls.BumpGroupsPagination(page=0).pack())],
         [InlineKeyboardButton(text=f"💡 Включено: {enabled}", callback_data="switch_auto_bump_items_enabled")],
         [InlineKeyboardButton(text=f"📦 Поднимать: {all}", callback_data="switch_auto_bump_items_all")],
         [InlineKeyboardButton(text=f"⏰ Интервал: {interval} сек.", callback_data="enter_auto_bump_items_interval")],

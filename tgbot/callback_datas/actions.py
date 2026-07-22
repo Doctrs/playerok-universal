@@ -34,6 +34,15 @@ class DeleteExcludedBumpItem(CallbackData, prefix="delexbu"):
     index: int
 
 
+class DeleteIncludedBumpGroupItem(CallbackData, prefix="delinbugr"):
+    group_index: int
+    index: int
+
+class DeleteExcludedBumpGroupItem(CallbackData, prefix="delexbugr"):
+    group_index: int
+    index: int
+
+
 class EnterFastReplyText(CallbackData, prefix="enrepl"):
     index: int
 

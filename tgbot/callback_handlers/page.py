@@ -46,7 +46,25 @@ async def callback_auto_delivery_page(callback: CallbackQuery, callback_data: ca
         reply_markup=templ.deliv_page_kb(index, last_page),
         callback=callback
     )
-    
+
+
+@router.callback_query(calls.BumpGroupPage.filter())
+async def callback_bump_group_page(callback: CallbackQuery, callback_data: calls.BumpGroupPage, state: FSMContext):
+    await state.set_state(None)
+
+    index = callback_data.index
+    await state.update_data(bump_group_index=index)
+
+    data = await state.get_data()
+    last_page = data.get("last_page", 0)
+
+    await throw_float_message(
+        state=state,
+        message=callback.message,
+        text=templ.bump_group_page_text(index),
+        reply_markup=templ.bump_group_page_kb(index, last_page),
+        callback=callback
+    )
 
 @router.callback_query(calls.MessagePage.filter())
 async def callback_message_page(callback: CallbackQuery, callback_data: calls.MessagePage, state: FSMContext):
