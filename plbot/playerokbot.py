@@ -351,7 +351,7 @@ class PlayerokBot:
             name_frmtd = item.name[:32] + ("..." if len(item.name) > 32 else "")
             
             included = any(
-                any(
+                all(
                     phrase.lower() in item.name.lower()
                     or item.name.lower() == phrase.lower()
                     for phrase in included_item
@@ -359,7 +359,7 @@ class PlayerokBot:
                 for included_item in self.auto_bump_items["included"]
             )
             excluded = any(
-                any(
+                all(
                     phrase.lower() in item.name.lower()
                     or item.name.lower() == phrase.lower()
                     for phrase in excluded_item
@@ -367,13 +367,7 @@ class PlayerokBot:
                 for excluded_item in self.auto_bump_items["excluded"]
             )
 
-            if (
-                self.config["playerok"]["auto_bump_items"]["all"]
-                and not excluded
-            ) or (
-                not self.config["playerok"]["auto_bump_items"]["all"]
-                and included
-            ):
+            if (self.config["playerok"]["auto_bump_items"]["all"] or included) and not excluded:
                 if not isinstance(item, MyItem):
                     try: item = self.account.get_item(item.id)
                     except: return
@@ -452,7 +446,7 @@ class PlayerokBot:
             name_frmtd = item.name[:32] + ("..." if len(item.name) > 32 else "")
             
             included = any(
-                any(
+                all(
                     phrase.lower() in item.name.lower()
                     or item.name.lower() == phrase.lower()
                     for phrase in included_item
@@ -460,7 +454,7 @@ class PlayerokBot:
                 for included_item in self.auto_restore_items["included"]
             )
             excluded = any(
-                any(
+                all(
                     phrase.lower() in item.name.lower()
                     or item.name.lower() == phrase.lower()
                     for phrase in excluded_item
@@ -468,13 +462,7 @@ class PlayerokBot:
                 for excluded_item in self.auto_restore_items["excluded"]
             )
 
-            if (
-                self.config["playerok"]["auto_restore_items"]["all"]
-                and not excluded
-            ) or (
-                not self.config["playerok"]["auto_restore_items"]["all"]
-                and included
-            ):
+            if (self.config["playerok"]["auto_restore_items"]["all"] or included) and not excluded:
                 if not isinstance(item, MyItem):
                     try: item = self.account.get_item(item.id)
                     except: return
@@ -989,7 +977,7 @@ class PlayerokBot:
                 except: return
 
             included = any(
-                any(
+                all(
                     phrase.lower() in event.deal.item.name.lower()
                     or event.deal.item.name.lower() == phrase.lower()
                     for phrase in included_item
@@ -997,7 +985,7 @@ class PlayerokBot:
                 for included_item in self.auto_complete_deals["included"]
             )
             excluded = any(
-                any(
+                all(
                     phrase.lower() in event.deal.item.name.lower()
                     or event.deal.item.name.lower() == phrase.lower()
                     for phrase in excluded_item
@@ -1005,13 +993,7 @@ class PlayerokBot:
                 for excluded_item in self.auto_complete_deals["excluded"]
             )
 
-            if (
-                self.config["playerok"]["auto_complete_deals"]["all"]
-                and not excluded
-            ) or (
-                not self.config["playerok"]["auto_complete_deals"]["all"]
-                and included
-            ):
+            if (self.config["playerok"]["auto_complete_deals"]["all"] or included) and not excluded:
                 self.account.update_deal(event.deal.id, ItemDealStatuses.SENT)
                 logger.info(
                     f"{Fore.YELLOW}Сделка подтверждена автоматически "
