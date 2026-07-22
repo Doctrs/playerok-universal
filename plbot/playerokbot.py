@@ -93,6 +93,7 @@ class PlayerokBot:
         self.__saved_chats: dict[str, Chat] = {}
         self._deal_sent_message_ids: set[str] = set()
         self._deal_sent_message_lock = Lock()
+        self._bump_in_progress = False
 
     def get_chat_by_id(self, chat_id: str) -> Chat:
         if chat_id in self.__saved_chats:
@@ -476,6 +477,7 @@ class PlayerokBot:
 
     def bump_items(self): 
         try:
+            self._bump_in_progress = True
             now = datetime.now().isoformat()
             items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
             up_items = [it for it in items if it.priority != PriorityTypes.DEFAULT]
@@ -484,18 +486,14 @@ class PlayerokBot:
             cnt = 0
 
             groups = self.auto_bump_items.get("groups", [])
-            groups_changed = False
             for i, group in enumerate(groups):
                 if not group.get("enabled"):
                     continue
                 group["last_time"] = now
-                groups_changed = True
+                sett.set("auto_bump_items", self.auto_bump_items)
                 cnt += self.bump_items_for_scope(
                     up_items, group, owning_group_index=i
                 )
-
-            if groups_changed:
-                sett.set("auto_bump_items", self.auto_bump_items)
 
             self.config["playerok"]["auto_bump_items"]["last_time"] = now
             sett.set("config", self.config)
@@ -509,6 +507,8 @@ class PlayerokBot:
         except Exception as e:
             logger.error(f"{Fore.LIGHTRED_EX}Ошибка при поднятии товаров: {Fore.WHITE}{e}")
             return False, 0, 0, e
+        finally:
+            self._bump_in_progress = False
 
     def restore_item(self, item: Item | MyItem | ItemProfile):
         try:
@@ -749,8 +749,9 @@ class PlayerokBot:
                     self.auto_restore_items = sett.get("auto_restore_items")
                 if sett.get("auto_complete_deals") != self.auto_complete_deals: 
                     self.auto_complete_deals = sett.get("auto_complete_deals")
-                if sett.get("auto_bump_items") != self.auto_bump_items: 
-                    self.auto_bump_items = sett.get("auto_bump_items")
+                if not self._bump_in_progress:
+                    if sett.get("auto_bump_items") != self.auto_bump_items: 
+                        self.auto_bump_items = sett.get("auto_bump_items")
                 
                 if data.get("initialized_users") != self.initialized_users: 
                     data.set("initialized_users", self.initialized_users)
@@ -782,7 +783,6 @@ class PlayerokBot:
                 try:
                     items = None
                     groups = self.auto_bump_items.get("groups", [])
-                    groups_changed = False
 
                     for i, group in enumerate(groups):
                         if (
@@ -792,17 +792,18 @@ class PlayerokBot:
                                 group.get("interval", 3600),
                             )
                         ):
-                            if items is None:
-                                all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
-                                items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
-                            group["last_time"] = datetime.now().isoformat()
-                            groups_changed = True
-                            self.bump_items_for_scope(
-                                items, group, owning_group_index=i
-                            )
-
-                    if groups_changed:
-                        sett.set("auto_bump_items", self.auto_bump_items)
+                            self._bump_in_progress = True
+                            try:
+                                if items is None:
+                                    all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
+                                    items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
+                                group["last_time"] = datetime.now().isoformat()
+                                sett.set("auto_bump_items", self.auto_bump_items)
+                                self.bump_items_for_scope(
+                                    items, group, owning_group_index=i
+                                )
+                            finally:
+                                self._bump_in_progress = False
 
                     if (
                         self.config["playerok"]["auto_bump_items"]["enabled"]
@@ -811,17 +812,22 @@ class PlayerokBot:
                             self.config["playerok"]["auto_bump_items"]["interval"]
                         )
                     ):
-                        if items is None:
-                            all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
-                            items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
-                        self.config["playerok"]["auto_bump_items"]["last_time"] = datetime.now().isoformat()
-                        sett.set("config", self.config)
-                        self.bump_items_for_scope(
-                            items,
-                            self._individual_bump_scope(),
-                            skip_if_in_groups=True,
-                        )
+                        self._bump_in_progress = True
+                        try:
+                            if items is None:
+                                all_items = self.get_my_items(statuses=[ItemStatuses.APPROVED])
+                                items = [it for it in all_items if it.priority != PriorityTypes.DEFAULT]
+                            self.config["playerok"]["auto_bump_items"]["last_time"] = datetime.now().isoformat()
+                            sett.set("config", self.config)
+                            self.bump_items_for_scope(
+                                items,
+                                self._individual_bump_scope(),
+                                skip_if_in_groups=True,
+                            )
+                        finally:
+                            self._bump_in_progress = False
                 except Exception as e:
+                    self._bump_in_progress = False
                     logger.error(f"{Fore.LIGHTRED_EX}Ошибка в цикле поднятия товаров: {Fore.WHITE}{e}")
                 time.sleep(3)
 
