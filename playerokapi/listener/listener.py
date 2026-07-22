@@ -127,10 +127,12 @@ class EventListener:
         | DealProblemResolvedEvent
         | DealStatusChangedEvent
     ]:
-        if not message or not message.text:
+        if not message:
             return []
+
+        text = message.text or ""
         
-        if message.text == "{{ITEM_PAID}}":
+        if text == "{{ITEM_PAID}}":
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -150,7 +152,7 @@ class EventListener:
                     ItemPaidEvent(actual_deal, chat)
                 ]
         
-        elif message.text == "{{ITEM_SENT}}":
+        elif text == "{{ITEM_SENT}}":
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -162,7 +164,7 @@ class EventListener:
                     DealStatusChangedEvent(actual_deal, chat)
                 ]
         
-        elif message.text.startswith("{{DEAL_CONFIRMED") and message.text.endswith("}}"): # DEAL_CONFIRMED, DEAL_CONFIRMED_AUTOMATICALLY
+        elif text.startswith("{{DEAL_CONFIRMED") and text.endswith("}}"): # DEAL_CONFIRMED, DEAL_CONFIRMED_AUTOMATICALLY
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -174,7 +176,7 @@ class EventListener:
                     DealStatusChangedEvent(actual_deal, chat),
                 ]
         
-        elif message.text == "{{DEAL_ROLLED_BACK}}":
+        elif text == "{{DEAL_ROLLED_BACK}}":
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -186,7 +188,7 @@ class EventListener:
                     DealStatusChangedEvent(actual_deal, chat),
                 ]
         
-        elif message.text == "{{DEAL_HAS_PROBLEM}}":
+        elif text == "{{DEAL_HAS_PROBLEM}}":
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -198,7 +200,7 @@ class EventListener:
                     DealStatusChangedEvent(actual_deal, chat),
                 ]
         
-        elif message.text == "{{DEAL_PROBLEM_RESOLVED}}":
+        elif text == "{{DEAL_PROBLEM_RESOLVED}}":
             actual_msg = self._get_actual_message(message.id, chat.id) or message
             actual_deal = self._get_actual_deal(actual_msg.deal.id) or message.deal
             
@@ -302,7 +304,9 @@ class EventListener:
             return False
     
     def _proccess_new_chat_message(self, chat, message):
-        events = []
+        if not chat or not message:
+            return []
+
         with self._state_lock:
             is_new_chat = chat.id not in [chat_.id for chat_ in self.chats]
 
@@ -315,11 +319,12 @@ class EventListener:
                         self.chats.append(chat)
                         break
 
-            if not self._is_msg_processed(message.id):
-                self.processed_msgs.append((message, chat.id))
+            if self._is_msg_processed(message.id):
+                return []
 
-        events.extend(self._parse_message_events(message, chat))
-        return events
+            self.processed_msgs.append((message, chat.id))
+
+        return self._parse_message_events(message, chat)
 
     def _process_chats_last_messages(self, chats):
         now = datetime.now(timezone.utc)
@@ -342,6 +347,10 @@ class EventListener:
             logger.debug(f"WS -> {msg_data}")
             
             if msg_data["type"] == "connection_ack":
+                # После reconnect старые subscription id уже невалидны.
+                with self._state_lock:
+                    self.chat_subscriptions.clear()
+
                 self._subscribe_chat_updated()
                 self._subscribe_user_updated()
 
@@ -359,29 +368,34 @@ class EventListener:
 
                 if "chatUpdated" in payload_data:
                     _chat = chat(payload_data["chatUpdated"])
-                    _message = chat_message(payload_data["chatUpdated"]["lastMessage"])
+                    _message = chat_message(payload_data["chatUpdated"].get("lastMessage"))
 
                     if not self._is_chat_subscribed(_chat.id):
                         self._subscribe_chat_message_created(_chat.id)
-                        
-                        events = [ChatInitializedEvent(_chat)]
-                        events.extend(self._proccess_new_chat_message(_chat, _message))
-                        for event in events:
-                            # yield event
+                        self.q.put(ChatInitializedEvent(_chat))
+
+                    # Обрабатываем lastMessage и для уже подписанных чатов:
+                    # chatMessageCreated иногда не приходит, а chatUpdated — да.
+                    if _message:
+                        for event in self._proccess_new_chat_message(_chat, _message):
                             self.q.put(event)
 
                 if "chatMessageCreated" in payload_data:
-                    chat_id = self.chat_subscriptions.get(msg_data["id"])
                     with self._state_lock:
+                        chat_id = self.chat_subscriptions.get(msg_data["id"])
                         _chat = next((chat_ for chat_ in self.chats if chat_.id == chat_id), None)
+                    if _chat is None and chat_id:
+                        try:
+                            _chat = self.account.get_chat(chat_id)
+                        except Exception:
+                            logger.debug(f"Чат {chat_id} не найден для chatMessageCreated")
+                            return
                     if _chat is None:
                         logger.debug(f"Чат {chat_id} ещё не в self.chats — пропуск chatMessageCreated")
                         return
                     _message = chat_message(payload_data["chatMessageCreated"])
 
-                    events = self._proccess_new_chat_message(_chat, _message)
-                    for event in events:
-                        # yield event
+                    for event in self._proccess_new_chat_message(_chat, _message):
                         self.q.put(event)
         except Exception:
             logger.debug(f"Ошибка обработки сообщения в WebSocket`е: {traceback.format_exc()}")

@@ -587,13 +587,14 @@ class PlayerokBot:
         plbot = get_playerok_bot()
         
         chat_user = next((u.username for u in chat.users if u.id != plbot.account.id), None)
+        message_user = message.user or message.event_by_user
         if not chat_user:
-            chat_user = message.user.username
+            chat_user = message_user.username if message_user else "—"
         
         ch_header = f"Новое сообщение в чате с {chat_user}:"
         
         logger.info(f"{ACCENT_COLOR}{ch_header.replace(chat_user, f'{Fore.LIGHTCYAN_EX}{chat_user}')}")
-        logger.info(f"{ACCENT_COLOR}│ {Fore.LIGHTWHITE_EX}{message.user.username}:")
+        logger.info(f"{ACCENT_COLOR}│ {Fore.LIGHTWHITE_EX}{message_user.username if message_user else '—'}:")
         
         max_width = shutil.get_terminal_size((80, 20)).columns - 40
         longest_line_len = 0
@@ -739,12 +740,13 @@ class PlayerokBot:
         Thread(target=withdrawal_loop, daemon=True).start()
 
     async def _on_new_message(self, event: NewMessageEvent):
-        if not event.message.user:
+        message_user = event.message.user or event.message.event_by_user
+        if not message_user:
             return
         
         self.log_new_message(event.message, event.chat)
         
-        if event.message.user.id == self.account.id:
+        if message_user.id == self.account.id:
             return
 
         is_support_chat = event.chat.id in (self.account.system_chat_id, self.account.support_chat_id)
@@ -773,7 +775,7 @@ class PlayerokBot:
                 self.log_to_tg(
                     log_text(
                         f'💬 Новое сообщение в <a href="https://playerok.com/chats/{event.chat.id}">чате</a>', 
-                        f"<b>{event.message.user.username}:</b> <blockquote>{text.strip()}</blockquote>"
+                        f"<b>{message_user.username}:</b> <blockquote>{text.strip()}</blockquote>"
                     ),
                     log_new_mess_kb(event.chat.id)
                 )
@@ -782,12 +784,12 @@ class PlayerokBot:
             not is_support_chat
             and event.message.text is not None
         ):
-            if event.message.user.id not in self.initialized_users:
-                self.initialized_users.append(event.message.user.id)
+            if message_user.id not in self.initialized_users:
+                self.initialized_users.append(message_user.id)
             
             elif event.message.text.lower() in ("!продавец", "!seller"):
                 asyncio.run_coroutine_threadsafe(
-                    get_telegram_bot().call_seller(event.message.user.username, event.chat.id), 
+                    get_telegram_bot().call_seller(message_user.username, event.chat.id), 
                     get_telegram_bot_loop()
                 )
                 self.send_message(event.chat.id, self.msg(
